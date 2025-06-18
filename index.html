@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Milka Invite</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="container">
+
+  <h2>Milka Invite</h2>
+  <div id="points" style="text-align:center; margin-bottom:20px; font-weight:600; font-size:1.2rem; color:#4dabf7;">Points : 1</div>
+
+  <div style="margin-bottom: 25px;">
+    <input type="text" id="serverName" placeholder="Nom du serveur Discord" />
+    <input type="url" id="serverLink" placeholder="Lien d'invitation Discord (https://...)" />
+    <input type="number" id="memberCount" placeholder="Nombre de membres" min="1" value="1" />
+    <button id="addServerBtn">Ajouter serveur</button>
+  </div>
+
+  <h2>Liste des serveurs</h2>
+  <ul id="serverList">
+    <!-- Serveurs ajoutés ici -->
+  </ul>
+
+</div>
+
+<script>
+  // Serveur fixe toujours présent pour chaque utilisateur
+  const fixedServer = {
+    name: "StarTrade",
+    link: "https://discord.gg/RJC3sFKVkn",
+    membersLeft: Infinity,
+    fixed: true
+  };
+
+  let points = parseInt(localStorage.getItem('points')) || 1;
+  let servers = JSON.parse(localStorage.getItem('servers')) || [];
+  let hiddenServers = JSON.parse(localStorage.getItem('hiddenServers')) || [];
+
+  function ensureFixedServer() {
+    const hasFixed = servers.some(s => s.fixed === true);
+    if (!hasFixed && !hiddenServers.includes(fixedServer.link)) {
+      servers.unshift({...fixedServer});
+      saveData();
+    }
+  }
+
+  const pointsDisplay = document.getElementById('points');
+  const serverList = document.getElementById('serverList');
+  const addServerBtn = document.getElementById('addServerBtn');
+  const serverNameInput = document.getElementById('serverName');
+  const serverLinkInput = document.getElementById('serverLink');
+  const memberCountInput = document.getElementById('memberCount');
+
+  function saveData() {
+    localStorage.setItem('points', points);
+    localStorage.setItem('servers', JSON.stringify(servers));
+    localStorage.setItem('hiddenServers', JSON.stringify(hiddenServers));
+  }
+
+  function updatePointsDisplay() {
+    pointsDisplay.textContent = `Points : ${points}`;
+  }
+
+  function createServerElement(server, index) {
+    const li = document.createElement('li');
+
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'server-info';
+
+    let membersLeftText = (server.fixed) ? "(Serveur fixe, toujours disponible)" : `Membres requis restants : ${server.membersLeft}`;
+    infoDiv.innerHTML = `<strong>${server.name}</strong><br/><a href="${server.link}" target="_blank">${server.link}</a>
+      <div class="members-needed">${membersLeftText}</div>`;
+
+    const btnGroup = document.createElement('div');
+    btnGroup.className = 'btn-group';
+
+    const joinBtn = document.createElement('button');
+    joinBtn.textContent = 'Rejoindre';
+    joinBtn.onclick = () => {
+      window.open(server.link, '_blank');
+
+      if (!server.fixed) {
+        points++;
+        server.membersLeft--;
+        if(server.membersLeft <= 0){
+          servers.splice(index, 1);
+        }
+      } else {
+        hiddenServers.push(server.link);
+        servers.splice(index, 1);
+      }
+
+      saveData();
+      updatePointsDisplay();
+      renderServers();
+      alert(`Tu as rejoint "${server.name}" !${!server.fixed ? " Tu as gagné 1 point." : ""}`);
+    };
+
+    const removeBtn = document.createElement('button');
+    removeBtn.textContent = 'Supprimer';
+    removeBtn.style.backgroundColor = '#f44336';
+
+    if (server.fixed) {
+      removeBtn.disabled = true;
+      removeBtn.title = "Impossible de supprimer ce serveur fixe.";
+    } else {
+      removeBtn.onclick = () => {
+        if(confirm(`Supprimer le serveur "${server.name}" ?`)) {
+          servers.splice(index, 1);
+          saveData();
+          renderServers();
+        }
+      };
+    }
+
+    btnGroup.appendChild(joinBtn);
+    btnGroup.appendChild(removeBtn);
+
+    li.appendChild(infoDiv);
+    li.appendChild(btnGroup);
+    return li;
+  }
+
+  function renderServers() {
+    serverList.innerHTML = '';
+
+    servers.forEach((server, i) => {
+      if (!hiddenServers.includes(server.link)) {
+        serverList.appendChild(createServerElement(server, i));
+      }
+    });
+
+    if (serverList.children.length === 0) {
+      const emptyLi = document.createElement('li');
+      emptyLi.textContent = 'Aucun serveur disponible pour le moment.';
+      serverList.appendChild(emptyLi);
+    }
+  }
+
+  addServerBtn.onclick = () => {
+    const name = serverNameInput.value.trim();
+    const link = serverLinkInput.value.trim();
+    const members = parseInt(memberCountInput.value);
+
+    if(!name || !link || !members || members < 1) {
+      alert('Merci de remplir tous les champs correctement (nom, lien, nombre de membres >= 1).');
+      return;
+    }
+    if(!/^https?:\/\/.+/.test(link)) {
+      alert('Le lien doit commencer par http:// ou https://');
+      return;
+    }
+    if(points < members) {
+      alert(`Tu n'as pas assez de points pour ajouter ce serveur (nécessite ${members} points).`);
+      return;
+    }
+
+    if (servers.some(s => s.link === link) || link === fixedServer.link) {
+      alert("Ce serveur est déjà dans la liste.");
+      return;
+    }
+
+    points -= members;
+    servers.push({name, link, membersLeft: members, fixed: false});
+    saveData();
+    updatePointsDisplay();
+    renderServers();
+    serverNameInput.value = '';
+    serverLinkInput.value = '';
+    memberCountInput.value = 1;
+  };
+
+  ensureFixedServer();
+  updatePointsDisplay();
+  renderServers();
+</script>
+
+</body>
+</html>
